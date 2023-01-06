@@ -1,0 +1,50 @@
+// 1. ffi 모듈 불러오기
+const ffi = require("ffi-napi");
+const { exit } = require("process");
+const ref = require("ref-napi");
+var doublePtr = ref.refType("double");
+var buf = Buffer.alloc(8 * 25600);
+var callback;
+var count=0;
+var libmylibrary;
+function init() {
+  // Interface into the native lib
+  // Dll_cb_get_test
+
+  libmylibrary = ffi.Library("./Node_Connection/Project1", {
+    init_NI: ["void", ["pointer", doublePtr]],
+    setProcessFlag: ["void", ["bool"]],
+    getProcessFlag: ["bool", []],
+    stopTask: ["void", []],
+  });
+
+  // Callback from the native lib back into js
+  callback = ffi.Callback("void", [], function () {
+    var rms =0;
+    for (let i = 0; i < 25600; i++) {
+      rms += buf.readDoubleLE(8 * i)*buf.readDoubleLE(8 * i);
+    }
+    rms /= 25600;
+    rms /= Math.sqrt(rms);
+    console.log(count + ", RMS : " + rms );
+    libmylibrary.setProcessFlag(true);
+    count += 1;
+  });
+  libmylibrary.init_NI(callback, buf);
+  
+}
+init();
+setTimeout(() =>
+{ 
+  console.log("after");
+  libmylibrary.stopTask();
+  exit();
+}, 20000);
+// let timerId = setInterval(get_data_c, 2000);
+// setTimeout(() => {
+//   clearInterval(timerId);
+//   for (let i = 0; i < 5; i++) {
+//     console.log("data[%d] : %f", i, buf.readDoubleLE(8 * i));
+//   }
+//   console.log("buf[0] : %f", buf.readDoubleLE(8 * 0));
+// }, 5000);
